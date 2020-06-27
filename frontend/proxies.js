@@ -29,6 +29,21 @@ function listMethods(context, listId) {
       return this
     },
 
+    indexOf(o, start = 0) {
+      const id = o[OBJECT_ID]
+      if (id) {
+        const list = context.getObject(listId)
+        for (let index = start; index < list.length; index++) {
+          if (list[index][OBJECT_ID] === id) {
+            return index
+          }
+        }
+        return -1  
+      } else {
+        return context.getObject(listId).indexOf(o, start)
+      }
+    },
+
     insertAt(index, ...values) {
       context.splice(listId, parseListIndex(index), 0, values)
       return this
@@ -84,10 +99,11 @@ function listMethods(context, listId) {
 
   // Read-only methods that can delegate to the JavaScript built-in implementations
   for (let method of ['concat', 'every', 'filter', 'find', 'findIndex', 'forEach', 'includes',
-                      'indexOf', 'join', 'lastIndexOf', 'map', 'reduce', 'reduceRight',
+                      'join', 'lastIndexOf', 'map', 'reduce', 'reduceRight',
                       'slice', 'some', 'toLocaleString', 'toString']) {
     methods[method] = (...args) => {
       const list = context.getObject(listId)
+        .map((item, index) => context.getObjectField(listId, index))
       return list[method].call(list, ...args)
     }
   }
@@ -105,13 +121,19 @@ const MapHandler = {
   },
 
   set (target, key, value) {
-    const { context, objectId } = target
+    const { context, objectId, readonly } = target
+    if (Array.isArray(readonly) && readonly.indexOf(key) >= 0) {
+      throw new RangeError(`Object property "${key}" cannot be modified`)
+    }
     context.setMapKey(objectId, 'map', key, value)
     return true
   },
 
   deleteProperty (target, key) {
-    const { context, objectId } = target
+    const { context, objectId, readonly } = target
+    if (Array.isArray(readonly) && readonly.indexOf(key) >= 0) {
+      throw new RangeError(`Object property "${key}" cannot be modified`)
+    }
     context.deleteMapKey(objectId, key)
     return true
   },
@@ -125,7 +147,10 @@ const MapHandler = {
     const { context, objectId } = target
     const object = context.getObject(objectId)
     if (key in object) {
-      return {configurable: true, enumerable: true}
+      return {
+        configurable: true, enumerable: true,
+        value: context.getObjectField(objectId, key)
+      }
     }
   },
 
@@ -169,15 +194,18 @@ const ListHandler = {
   },
 
   getOwnPropertyDescriptor (target, key) {
-    if (key === 'length') return {}
-    if (key === OBJECT_ID) return {configurable: false, enumerable: false}
-
     const [context, objectId] = target
     const object = context.getObject(objectId)
 
+    if (key === 'length') return {writable: true, value: object.length}
+    if (key === OBJECT_ID) return {configurable: false, enumerable: false, value: objectId}
+
     if (typeof key === 'string' && /^[0-9]+$/.test(key)) {
       const index = parseListIndex(key)
-      if (index < object.length) return {configurable: true, enumerable: true}
+      if (index < object.length) return {
+        configurable: true, enumerable: true,
+        value: context.getObjectField(objectId, index)
+      }
     }
   },
 
@@ -185,13 +213,13 @@ const ListHandler = {
     const [context, objectId] = target
     const object = context.getObject(objectId)
     let keys = ['length']
-    keys.push(...Object.keys(object))
+    for (let key of Object.keys(object)) keys.push(key)
     return keys
   }
 }
 
-function mapProxy(context, objectId) {
-  return new Proxy({context, objectId}, MapHandler)
+function mapProxy(context, objectId, readonly) {
+  return new Proxy({context, objectId, readonly}, MapHandler)
 }
 
 function listProxy(context, objectId) {
@@ -202,15 +230,16 @@ function listProxy(context, objectId) {
  * Instantiates a proxy object for the given `objectId`.
  * This function is added as a method to the context object by rootObjectProxy().
  * When it is called, `this` is the context object.
+ * `readonly` is a list of map property names that cannot be modified.
  */
-function instantiateProxy(objectId) {
+function instantiateProxy(objectId, readonly) {
   const object = this.getObject(objectId)
-  if (Array.isArray(object) || (object instanceof Text)) {
+  if (Array.isArray(object)) {
     return listProxy(this, objectId)
-  } else if (object instanceof Table) {
+  } else if (object instanceof Text || object instanceof Table) {
     return object.getWriteable(this)
   } else {
-    return mapProxy(this, objectId)
+    return mapProxy(this, objectId, readonly)
   }
 }
 

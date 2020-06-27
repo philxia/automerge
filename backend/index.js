@@ -117,7 +117,7 @@ class MaterializationContext {
     for (let childId of this.children[objectId]) {
       this.makePatch(childId, diffs)
     }
-    diffs.push(...this.diffs[objectId])
+    for (let d of this.diffs[objectId]) diffs.push(d)
   }
 }
 
@@ -149,7 +149,7 @@ function apply(state, changes, undoable) {
   for (let change of fromJS(changes)) {
     change = change.remove('requestType')
     const [newOpSet, diff] = OpSet.addChange(opSet, change, undoable)
-    diffs.push(...diff)
+    for (let d of diff) diffs.push(d)
     opSet = newOpSet
   }
 
@@ -186,7 +186,8 @@ function applyLocalChange(state, change) {
 
   let patch
   if (change.requestType === 'change') {
-    ;[state, patch] = apply(state, [change], true)
+    const undoable = (change.undoable === false) ? false : true
+    ;[state, patch] = apply(state, [change], undoable)
   } else if (change.requestType === 'undo') {
     ;[state, patch] = undo(state, change)
   } else if (change.requestType === 'redo') {

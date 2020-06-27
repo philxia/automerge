@@ -1,6 +1,6 @@
-const { ROOT_ID, isObject, parseElemId } = require('../src/common')
-const { OBJECT_ID, CONFLICTS, ELEM_IDS, MAX_ELEM } = require('./constants')
-const { Text } = require('./text')
+const { ROOT_ID, isObject, copyObject, parseElemId } = require('../src/common')
+const { OPTIONS, OBJECT_ID, CONFLICTS, ELEM_IDS, MAX_ELEM } = require('./constants')
+const { Text, instantiateText } = require('./text')
 const { Table, instantiateTable } = require('./table')
 const { Counter } = require('./counter')
 
@@ -67,8 +67,8 @@ function cloneMapObject(originalObject, objectId) {
   if (originalObject && originalObject[OBJECT_ID] !== objectId) {
     throw new RangeError(`cloneMapObject ID mismatch: ${originalObject[OBJECT_ID]} !== ${objectId}`)
   }
-  let object = Object.assign({}, originalObject)
-  let conflicts = Object.assign({}, originalObject ? originalObject[CONFLICTS] : undefined)
+  let object = copyObject(originalObject)
+  let conflicts = copyObject(originalObject ? originalObject[CONFLICTS] : undefined)
   Object.defineProperty(object, CONFLICTS, {value: conflicts})
   Object.defineProperty(object, OBJECT_ID, {value: objectId})
   return object
@@ -135,14 +135,14 @@ function parentMapObject(objectId, cache, updated) {
       value = conflicts[actorId]
       if (isObject(value) && updated[value[OBJECT_ID]]) {
         if (!conflictsUpdate) {
-          conflictsUpdate = Object.assign({}, conflicts)
+          conflictsUpdate = copyObject(conflicts)
           object[CONFLICTS][key] = conflictsUpdate
         }
         conflictsUpdate[actorId] = updated[value[OBJECT_ID]]
       }
     }
 
-    if (conflictsUpdate) {
+    if (conflictsUpdate && cache[ROOT_ID][OPTIONS].freeze) {
       Object.freeze(conflictsUpdate)
     }
   }
@@ -167,10 +167,10 @@ function updateTableObject(diff, cache, updated, inbound) {
     const previous = object.byId(diff.key)
     if (isObject(previous)) refsBefore[previous[OBJECT_ID]] = true
     if (diff.link) {
-      object.set(diff.key, updated[diff.value] || cache[diff.value])
+      object._set(diff.key, updated[diff.value] || cache[diff.value])
       refsAfter[diff.value] = true
     } else {
-      object.set(diff.key, diff.value)
+      object._set(diff.key, diff.value)
     }
   } else if (diff.action === 'remove') {
     const previous = object.byId(diff.key)
@@ -197,7 +197,7 @@ function parentTableObject(objectId, cache, updated) {
   for (let key of Object.keys(table.entries)) {
     let value = table.byId(key)
     if (isObject(value) && updated[value[OBJECT_ID]]) {
-      table.set(key, updated[value[OBJECT_ID]])
+      table._set(key, updated[value[OBJECT_ID]])
     }
   }
 }
@@ -295,14 +295,14 @@ function parentListObject(objectId, cache, updated) {
       value = conflicts[actorId]
       if (isObject(value) && updated[value[OBJECT_ID]]) {
         if (!conflictsUpdate) {
-          conflictsUpdate = Object.assign({}, conflicts)
+          conflictsUpdate = copyObject(conflicts)
           list[CONFLICTS][index] = conflictsUpdate
         }
         conflictsUpdate[actorId] = updated[value[OBJECT_ID]]
       }
     }
 
-    if (conflictsUpdate) {
+    if (conflictsUpdate && cache[ROOT_ID][OPTIONS].freeze) {
       Object.freeze(conflictsUpdate)
     }
   }
@@ -320,9 +320,9 @@ function updateTextObject(diffs, startIndex, endIndex, cache, updated) {
     if (cache[objectId]) {
       const elems = cache[objectId].elems.slice()
       const maxElem = cache[objectId][MAX_ELEM]
-      updated[objectId] = new Text(objectId, elems, maxElem)
+      updated[objectId] = instantiateText(objectId, elems, maxElem)
     } else {
-      updated[objectId] = new Text(objectId)
+      updated[objectId] = instantiateText(objectId, [], 0)
     }
   }
 
@@ -341,7 +341,8 @@ function updateTextObject(diffs, startIndex, endIndex, cache, updated) {
         insertions = []
       }
       maxElem = Math.max(maxElem, parseElemId(diff.elemId).counter)
-      insertions.push({elemId: diff.elemId, value: diff.value, conflicts: diff.conflicts})
+      const value = getValue(diff, cache, updated)
+      insertions.push({elemId: diff.elemId, value, conflicts: diff.conflicts})
 
       if (startIndex === endIndex || diffs[startIndex + 1].action !== 'insert' ||
           diffs[startIndex + 1].index !== diff.index + 1) {
@@ -352,7 +353,7 @@ function updateTextObject(diffs, startIndex, endIndex, cache, updated) {
     } else if (diff.action === 'set') {
       elems[diff.index] = {
         elemId: elems[diff.index].elemId,
-        value: diff.value,
+        value: getValue(diff, cache, updated),
         conflicts: diff.conflicts
       }
 
@@ -379,7 +380,7 @@ function updateTextObject(diffs, startIndex, endIndex, cache, updated) {
 
     startIndex += 1
   }
-  updated[objectId] = new Text(objectId, elems, maxElem)
+  updated[objectId] = instantiateText(objectId, elems, maxElem)
 }
 
 /**

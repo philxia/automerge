@@ -3,7 +3,7 @@ const { applyDiffs } = require('./apply_patch')
 const { Text, getElemId } = require('./text')
 const { Table } = require('./table')
 const { Counter, getWriteableCounter } = require('./counter')
-const { isObject } = require('../src/common')
+const { isObject, copyObject } = require('../src/common')
 const uuid = require('../src/uuid')
 
 
@@ -17,7 +17,7 @@ class Context {
     this.actorId = actorId
     this.cache = doc[CACHE]
     this.updated = {}
-    this.inbound = Object.assign({}, doc[INBOUND])
+    this.inbound = copyObject(doc[INBOUND])
     this.ops = []
     this.diffs = []
   }
@@ -72,16 +72,29 @@ class Context {
    * object is an existing Automerge object, its existing ID is returned.
    */
   createNestedObjects(value) {
-    if (typeof value[OBJECT_ID] === 'string') return value[OBJECT_ID]
+    if (typeof value[OBJECT_ID] === 'string') {
+      throw new TypeError(
+        'Cannot assign an object that already belongs to an Automerge document. ' +
+        'See https://github.com/automerge/automerge#making-fine-grained-changes')
+    }
     const objectId = uuid()
 
     if (value instanceof Text) {
       // Create a new Text object
-      if (value.length > 0) {
-        throw new RangeError('Assigning a non-empty Text object is not supported')
-      }
       this.apply({action: 'create', type: 'text', obj: objectId})
       this.addOp({action: 'makeText', obj: objectId})
+
+      if (value.length > 0) {
+        this.splice(objectId, 0, 0, [...value])
+      }
+
+      // Set object properties so that any subsequent modifications of the Text
+      // object can be applied to the context
+      let text = this.getObject(objectId)
+      value[OBJECT_ID] = objectId
+      value.elems = text.elems
+      value[MAX_ELEM] = text.maxElem
+      value.context = this
 
     } else if (value instanceof Table) {
       // Create a new Table object
@@ -90,7 +103,6 @@ class Context {
       }
       this.apply({action: 'create', type: 'table', obj: objectId})
       this.addOp({action: 'makeTable', obj: objectId})
-      this.setMapKey(objectId, 'table', 'columns', value.columns)
 
     } else if (Array.isArray(value)) {
       // Create a new list object
@@ -269,11 +281,14 @@ class Context {
    * Returns the objectId of the new row.
    */
   addTableRow(objectId, row) {
-    if (!isObject(row)) {
+    if (!isObject(row) || Array.isArray(row)) {
       throw new TypeError('A table row must be an object')
     }
     if (row[OBJECT_ID]) {
       throw new TypeError('Cannot reuse an existing object as table row')
+    }
+    if (row.id) {
+      throw new TypeError('A table row must not have an "id" property; it is generated automatically')
     }
 
     const rowId = this.createNestedObjects(row)

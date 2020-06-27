@@ -7,9 +7,8 @@ const { isObject } = require('./common')
 /**
  * Constructs a new frontend document that reflects the given list of changes.
  */
-function docFromChanges(actorId, changes) {
-  if (!actorId) throw new RangeError('actorId is required in docFromChanges')
-  const doc = Frontend.init({actorId, backend: Backend})
+function docFromChanges(options, changes) {
+  const doc = init(options)
   const [state, _] = Backend.applyChanges(Backend.init(), changes)
   const patch = Backend.getPatch(state)
   patch.state = state
@@ -18,37 +17,52 @@ function docFromChanges(actorId, changes) {
 
 ///// Automerge.* API
 
-function init(actorId) {
-  return Frontend.init({actorId, backend: Backend})
+function init(options) {
+  if (typeof options === 'string') {
+    options = {actorId: options}
+  } else if (typeof options === 'undefined') {
+    options = {}
+  } else if (!isObject(options)) {
+    throw new TypeError(`Unsupported options for init(): ${options}`)
+  }
+  return Frontend.init(Object.assign({backend: Backend}, options))
 }
 
-function change(doc, message, callback) {
-  const [newDoc, change] = Frontend.change(doc, message, callback)
+/**
+ * Returns a new document object initialized with the given state.
+ */
+function from(initialState, options) {
+  const changeOpts = {message: 'Initialization', undoable: false}
+  return change(init(options), changeOpts, doc => Object.assign(doc, initialState))
+}
+
+function change(doc, options, callback) {
+  const [newDoc, change] = Frontend.change(doc, options, callback)
   return newDoc
 }
 
-function emptyChange(doc, message) {
-  const [newDoc, change] = Frontend.emptyChange(doc, message)
+function emptyChange(doc, options) {
+  const [newDoc, change] = Frontend.emptyChange(doc, options)
   return newDoc
 }
 
-function undo(doc, message) {
-  const [newDoc, change] = Frontend.undo(doc, message)
+function undo(doc, options) {
+  const [newDoc, change] = Frontend.undo(doc, options)
   return newDoc
 }
 
-function redo(doc, message) {
-  const [newDoc, change] = Frontend.redo(doc, message)
+function redo(doc, options) {
+  const [newDoc, change] = Frontend.redo(doc, options)
   return newDoc
 }
 
-function load(string, actorId) {
-  return docFromChanges(actorId || uuid(), transit.fromJSON(string))
+function load(string, options) {
+  return docFromChanges(options, transit.fromJSON(string))
 }
 
 function save(doc) {
   const state = Frontend.getBackendState(doc)
-  return transit.toJSON(state.getIn(['opSet', 'history']))
+  return transit.toJSON(state.getIn(['opSet', 'history']).concat(state.getIn(['opSet', 'queue'])))
 }
 
 function merge(localDoc, remoteDoc) {
@@ -75,6 +89,10 @@ function getChanges(oldDoc, newDoc) {
   const oldState = Frontend.getBackendState(oldDoc)
   const newState = Frontend.getBackendState(newDoc)
   return Backend.getChanges(oldState, newState)
+}
+
+function getAllChanges(doc) {
+  return getChanges(init(), doc)
 }
 
 function applyChanges(doc, changes) {
@@ -116,8 +134,8 @@ function getHistory(doc) {
 }
 
 module.exports = {
-  init, change, emptyChange, undo, redo,
-  load, save, merge, diff, getChanges, applyChanges, getMissingDeps,
+  init, from, change, emptyChange, undo, redo,
+  load, save, merge, diff, getChanges, getAllChanges, applyChanges, getMissingDeps,
   equals, getHistory, uuid,
   Frontend, Backend,
   DocSet: require('./doc_set'),

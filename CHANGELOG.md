@@ -8,8 +8,72 @@ is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.14.1] — 2020-05-25
+
+- **Fixed** [#249]: Corrected TypeScript declaration for `Automerge.Table.rows` ([@lauritzsh])
+- **Fixed** [#252]: Corrected TypeScript declaration for `WatchableDoc` ([@vincentcapicotto])
+- **Fixed** [#258]: Changes whose dependencies are missing are now preserved when saving and
+  reloading a document ([@KarenSarmiento], [@ept])
+- **Changed** [#260]: If you try to assign an object that is already in an Automerge document,
+  you now get a more descriptive error message ([@johannesjo], [@ept])
+
+## [0.14.0] — 2020-03-25
+
+- **Removed** [#236]: Undocumented `Automerge.Table` API that allowed rows to be added by
+  providing an array of values. Now rows must be given as an object ([@HerbCaudill])
+- **Removed** [#241]: Constructor of `Automerge.Table` no longer takes an array of columns, and
+  the `columns` property of `Automerge.Table` is also removed ([@ept])
+- **Changed** [#242]: Rows of `Automerge.Table` now automatically get an `id` property containing
+  the primary key of that row ([@ept])
+- **Removed** [#243]: `Automerge.Table` objects no longer have a `set()` method. Use `add()` or
+  `remove()` instead ([@ept])
+- **Removed** support for Node 8, which is no longer being maintained
+- **Added** [#194], [#238]: `Automerge.Text` objects may now contain objects as well as strings;
+  new method `Text.toSpans()` that concatenates characters while leaving objects unchanged
+  ([@pvh], [@ept], [@nornagon])
+
+## [0.13.0] — 2020-02-24
+
+- **Added** [#232]: New API `Automerge.getAllChanges()` returns all changes ([@ept])
+- **Fixed** [#230]: `Text.deleteAt` allows zero characters to be deleted ([@skokenes])
+- **Fixed** [#219]: `canUndo` is false immediately after `Automerge.from` ([@ept])
+- **Fixed** [#215]: Adjust TypeScript definition of `Freeze<T>` ([@jeffpeterson])
+
+## [0.12.1] — 2019-08-22
+
+- **Fixed** [#184]: Corrected TypeScript type definition for `Automerge.DocSet` ([@HerbCaudill])
+- **Fixed** [#174]: If `.filter()`, `.find()` or similar methods are used inside a change callback,
+  the objects they return can now be mutated ([@ept], [@airhorns])
+- **Fixed** [#199]: `Automerge.Text.toString()` now returns the unadulterated text ([@Gozala])
+- **Added** [#210]: New method `DocSet.removeDoc()` ([@brentkeller])
+
+## [0.12.0] — 2019-08-07
+
+- **Changed** [#183]: `Frontend.from()` now accepts initialization options ([@HerbCaudill], [@ept])
+- **Changed** [#180]: Mutation methods on `Automerge.Text` are now available without having to
+  assign the object to a document ([@ept])
+- **Added** [#181]: Can now specify an initial value when creating `Automerge.Text` objects
+  ([@Gozala], [@ept])
+- **Fixed** [#202]: Stack overflow error when making large changes ([@HerbCaudill], [@ept])
+
+## [0.11.0] — 2019-07-13
+
+- **Added** [#127]: New `Automerge.from` function creates a new document and initializes it
+  with an initial state given as an argument ([@HerbCaudill], [@ept])
+- **Added** [#155]: Type definitions now allow TypeScript applications to use Automerge with
+  static type-checking ([@HerbCaudill], [@airhorns], [@aslakhellesoy], [@ept])
+- **Changed** [#177]: Automerge documents are no longer made immutable with `Object.freeze`
+  by default, due to the performance cost. Use the `{freeze: true}` option to continue
+  using immutable objects. ([@izuchukwu], [@ept])
+- **Fixed** [#165]: Undo/redo now work when using separate frontend and backend ([@ept])
+
+## [0.10.1] — 2019-05-17
+
 - **Fixed** [#151]: Exception "Duplicate list element ID" after a list element was added and
   removed again in the same change callback ([@ept], [@minhhien1996])
+- **Changed** [#163]: Calling `JSON.stringify` on an Automerge document containing
+  `Automerge.Text`, `Automerge.Table` or `Automerge.Counter` now serializes those objects in a
+  clean way, rather than dumping the object's internal properties ([@ept])
 
 ## [0.10.0] — 2019-02-04
 
@@ -178,7 +242,13 @@ is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - First public release.
 
 
-[Unreleased]: https://github.com/automerge/automerge/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/automerge/automerge/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/automerge/automerge/compare/v0.13.1...v0.14.0
+[0.13.0]: https://github.com/automerge/automerge/compare/v0.12.1...v0.13.0
+[0.12.1]: https://github.com/automerge/automerge/compare/v0.12.0...v0.12.1
+[0.12.0]: https://github.com/automerge/automerge/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/automerge/automerge/compare/v0.10.1...v0.11.0
+[0.10.1]: https://github.com/automerge/automerge/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/automerge/automerge/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/automerge/automerge/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/automerge/automerge/compare/v0.9.0...v0.9.1
@@ -202,6 +272,31 @@ is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 [0.4.0]: https://github.com/automerge/automerge/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/automerge/automerge/compare/v0.2.0...v0.3.0
 
+[#260]: https://github.com/automerge/automerge/issues/260
+[#258]: https://github.com/automerge/automerge/issues/258
+[#252]: https://github.com/automerge/automerge/pull/252
+[#249]: https://github.com/automerge/automerge/pull/249
+[#243]: https://github.com/automerge/automerge/pull/243
+[#242]: https://github.com/automerge/automerge/pull/242
+[#241]: https://github.com/automerge/automerge/pull/241
+[#238]: https://github.com/automerge/automerge/pull/238
+[#236]: https://github.com/automerge/automerge/pull/236
+[#232]: https://github.com/automerge/automerge/pull/232
+[#230]: https://github.com/automerge/automerge/issues/230
+[#219]: https://github.com/automerge/automerge/issues/219
+[#210]: https://github.com/automerge/automerge/pull/210
+[#202]: https://github.com/automerge/automerge/issues/202
+[#199]: https://github.com/automerge/automerge/pull/199
+[#194]: https://github.com/automerge/automerge/issues/194
+[#184]: https://github.com/automerge/automerge/pull/184
+[#183]: https://github.com/automerge/automerge/pull/183
+[#181]: https://github.com/automerge/automerge/pull/181
+[#180]: https://github.com/automerge/automerge/issues/180
+[#177]: https://github.com/automerge/automerge/issues/177
+[#174]: https://github.com/automerge/automerge/issues/174
+[#165]: https://github.com/automerge/automerge/pull/165
+[#163]: https://github.com/automerge/automerge/pull/163
+[#155]: https://github.com/automerge/automerge/pull/155
 [#151]: https://github.com/automerge/automerge/issues/151
 [#150]: https://github.com/automerge/automerge/pull/150
 [#148]: https://github.com/automerge/automerge/pull/148
@@ -211,6 +306,7 @@ is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 [#130]: https://github.com/automerge/automerge/pull/130
 [#129]: https://github.com/automerge/automerge/pull/129
 [#128]: https://github.com/automerge/automerge/pull/128
+[#127]: https://github.com/automerge/automerge/issues/127
 [#126]: https://github.com/automerge/automerge/pull/126
 [#125]: https://github.com/automerge/automerge/pull/125
 [#120]: https://github.com/automerge/automerge/pull/120
@@ -250,18 +346,29 @@ is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 [#30]: https://github.com/automerge/automerge/pull/30
 [#29]: https://github.com/automerge/automerge/issues/29
 
+[@airhorns]: https://github.com/airhorns
 [@aslakhellesoy]: https://github.com/aslakhellesoy
+[@brentkeller]: https://github.com/brentkeller
 [@CGNonofr]: https://github.com/CGNonofr
 [@EthanRBrown]: https://github.com/EthanRBrown
+[@Gozala]: https://github.com/Gozala
+[@HerbCaudill]: https://github.com/HerbCaudill
+[@izuchukwu]: https://github.com/izuchukwu
 [@jeffpeterson]: https://github.com/jeffpeterson
 [@jimpick]: https://github.com/jimpick
+[@johannesjo]: https://github.com/johannesjo
 [@ept]: https://github.com/ept
+[@KarenSarmiento]: https://github.com/KarenSarmiento
 [@kpruden]: https://github.com/kpruden
+[@lauritzsh]: https://github.com/lauritzsh
 [@mattkrick]: https://github.com/mattkrick
 [@minhhien1996]: https://github.com/minhhien1996
 [@mmcgrana]: https://github.com/mmcgrana
 [@mmmm1998]: https://github.com/mmmm1998
+[@nornagon]: https://github.com/nornagon
 [@pvh]: https://github.com/pvh
 [@salzhrani]: https://github.com/salzhrani
 [@saranrapjs]: https://github.com/saranrapjs
+[@skokenes]: https://github.com/skokenes
+[@vincentcapicotto]: https://github.com/vincentcapicotto
 [@wincent]: https://github.com/wincent

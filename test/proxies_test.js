@@ -1,7 +1,8 @@
 const assert = require('assert')
 const Automerge = process.env.TEST_DIST === '1' ? require('../dist/automerge') : require('../src/automerge')
-const { equalsOneOf } = require('./helpers')
+const { assertEqualsOneOf } = require('./helpers')
 const ROOT_ID = '00000000-0000-0000-0000-000000000000'
+const UUID_PATTERN = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/
 
 describe('Automerge proxy API', () => {
   describe('root object', () => {
@@ -13,7 +14,7 @@ describe('Automerge proxy API', () => {
 
     it('should know its actor ID', () => {
       Automerge.change(Automerge.init(), doc => {
-        assert(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(Automerge.getActorId(doc)))
+        assert(UUID_PATTERN.test(Automerge.getActorId(doc).toString()))
         assert.notEqual(Automerge.getActorId(doc), ROOT_ID)
         assert.strictEqual(Automerge.getActorId(Automerge.init('customActorId')), 'customActorId')
       })
@@ -48,7 +49,7 @@ describe('Automerge proxy API', () => {
         doc.key1 = 'value1'
         assert.deepEqual(Object.keys(doc), ['key1'])
         doc.key2 = 'value2'
-        equalsOneOf(Object.keys(doc), ['key1', 'key2'], ['key2', 'key1'])
+        assertEqualsOneOf(Object.keys(doc), ['key1', 'key2'], ['key2', 'key1'])
       })
     })
 
@@ -58,7 +59,7 @@ describe('Automerge proxy API', () => {
         doc.key1 = 'value1'
         assert.deepEqual(Object.getOwnPropertyNames(doc), ['key1'])
         doc.key2 = 'value2'
-        equalsOneOf(Object.getOwnPropertyNames(doc), ['key1', 'key2'], ['key2', 'key1'])
+        assertEqualsOneOf(Object.getOwnPropertyNames(doc), ['key1', 'key2'], ['key2', 'key1'])
       })
     })
 
@@ -109,7 +110,7 @@ describe('Automerge proxy API', () => {
   describe('list object', () => {
     let root
     beforeEach(() => {
-      root = Automerge.change(Automerge.init(), doc => { doc.list = [1, 2, 3]; doc.empty = [] })
+      root = Automerge.change(Automerge.init(), doc => { doc.list = [1, 2, 3]; doc.empty = [], doc.listObjects = [ {id: "first"}, {id: "second"} ] })
     })
 
     it('should look like a JavaScript array', () => {
@@ -169,7 +170,7 @@ describe('Automerge proxy API', () => {
     it('should support JSON.stringify()', () => {
       Automerge.change(root, doc => {
         assert.deepEqual(JSON.parse(JSON.stringify(doc)), {
-          list: [1, 2, 3], empty: []
+          list: [1, 2, 3], empty: [], listObjects: [ {id: "first"}, {id: "second"} ]
         })
         assert.deepEqual(JSON.stringify(doc.list), '[1,2,3]')
       })
@@ -186,7 +187,7 @@ describe('Automerge proxy API', () => {
       })
     })
 
-    describe('should support standard read-only methods', () => {
+    describe('should support standard array read-only operations', () => {
       it('concat()', () => {
         Automerge.change(root, doc => {
           assert.deepEqual(doc.list.concat([4, 5, 6]), [1, 2, 3, 4, 5, 6])
@@ -267,6 +268,18 @@ describe('Automerge proxy API', () => {
           assert.strictEqual(doc.list.indexOf(1, 1), -1)
           assert.strictEqual(doc.list.indexOf(2, -2), 1)
           assert.strictEqual(doc.list.indexOf(0), -1)
+        })
+      })
+
+      it('indexOf() with objects', () => {
+        Automerge.change(root, doc => {
+          assert.strictEqual(doc.listObjects.indexOf(doc.listObjects[0]), 0)
+          assert.strictEqual(doc.listObjects.indexOf(doc.listObjects[1]), 1)
+
+          assert.strictEqual(doc.listObjects.indexOf(doc.listObjects[0], 0), 0)
+          assert.strictEqual(doc.listObjects.indexOf(doc.listObjects[0], 1), -1)
+          assert.strictEqual(doc.listObjects.indexOf(doc.listObjects[1], 0), 1)
+          assert.strictEqual(doc.listObjects.indexOf(doc.listObjects[1], 1), 1)
         })
       })
 
@@ -362,6 +375,26 @@ describe('Automerge proxy API', () => {
           assert.deepEqual(values, [1, 2, 3])
           assert.deepEqual([...doc.list.values()], [1, 2, 3])
         })
+      })
+
+      it('should allow mutation of objects returned from built in list iteration', () => {
+        root = Automerge.change(Automerge.init({freeze: true}), doc => {
+          doc.objects = [{id: 1, value: 'one'}, {id: 2, value: 'two'}]
+        })
+        root = Automerge.change(root, doc => {
+          for (let obj of doc.objects) if (obj.id === 1) obj.value = 'ONE!'
+        })
+        assert.deepEqual(root, {objects: [{id: 1, value: 'ONE!'}, {id: 2, value: 'two'}]})
+      })
+
+      it('should allow mutation of objects returned from readonly list methods', () => {
+        root = Automerge.change(Automerge.init({freeze: true}), doc => {
+          doc.objects = [{id: 1, value: 'one'}, {id: 2, value: 'two'}]
+        })
+        root = Automerge.change(root, doc => {
+          doc.objects.find(obj => obj.id === 1).value = 'ONE!'
+        })
+        assert.deepEqual(root, {objects: [{id: 1, value: 'ONE!'}, {id: 2, value: 'two'}]})
       })
     })
 

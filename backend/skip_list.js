@@ -25,14 +25,13 @@ class Node {
     this.key = key
     this.value = value
     this.level = level
-    this.prevKey = Object.freeze(prevKey)
-    this.nextKey = Object.freeze(nextKey)
-    this.prevCount = Object.freeze(prevCount)
-    this.nextCount = Object.freeze(nextCount)
-    Object.freeze(this)
+    this.prevKey = prevKey
+    this.nextKey = nextKey
+    this.prevCount = prevCount
+    this.nextCount = nextCount
   }
 
-  setValue (key, value) {
+  setValue (value) {
     return new Node(this.key, value, this.level, this.prevKey, this.nextKey,
                     this.prevCount, this.nextCount)
   }
@@ -301,7 +300,7 @@ class SkipList {
     let node = this._nodes.get(key)
     if (!node) throw new RangeError('The referenced key does not exist')
 
-    node = node.setValue(key, value)
+    node = node.setValue(value)
     return makeInstance(this.length, this._nodes.set(key, node), this._randomSource)
   }
 
@@ -338,7 +337,7 @@ function makeInstance(length, nodes, randomSource) {
   instance.length = length
   instance._nodes = nodes
   instance._randomSource = randomSource
-  return Object.freeze(instance)
+  return instance
 }
 
 module.exports = {SkipList}
